@@ -25,6 +25,8 @@ export const CANAL_ETIQUETA: Record<Canal, string> = {
 export type Deteccion = "parametro" | "subdominio" | "referente" | "sin-dato";
 
 export type Rastreo = {
+  /** Identificador de esta visita. Es la clave para unir progreso y envío. */
+  visita: string;
   canal: Canal;
   canalCrudo: string;
   /** Cómo se supo el canal la primera vez. No se sobreescribe al reusarlo. */
@@ -116,6 +118,15 @@ function canalPorReferente(referente: string): Canal | null {
   return null;
 }
 
+/** randomUUID solo existe en contexto seguro; el respaldo sirve igual. */
+function nuevaVisita() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
 function leerGuardado(): Rastreo | null {
   try {
     const crudo = window.sessionStorage.getItem(CLAVE_SESION);
@@ -195,6 +206,7 @@ export function resolverRastreo(): Rastreo {
   }
 
   const rastreo: Rastreo = {
+    visita: nuevaVisita(),
     canal: canal ?? "otro",
     canalCrudo,
     deteccion: canal ? deteccion : "sin-dato",

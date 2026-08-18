@@ -24,6 +24,39 @@ const VACIO: Record<string, string> = Object.fromEntries(
   CAMPOS.map((campo) => [campo.id, ""]),
 );
 
+/* Enlace de invitación al grupo de WhatsApp. Se inyecta al compilar, así que
+   hay que volver a desplegar después de cambiarlo en Vercel. Si no está
+   configurado, la pantalla final no muestra el botón en vez de un enlace roto. */
+const GRUPO = process.env.NEXT_PUBLIC_WHATSAPP_GRUPO ?? "";
+
+/** Reporte de avance: cuánto lleva y en qué pregunta se quedó. */
+function armarProgreso(
+  valores: Record<string, string>,
+  respondidas: number,
+  rastreo: Rastreo | null,
+) {
+  const ultima = [...CAMPOS]
+    .reverse()
+    .find((campo) => estaRespondido(campo, valores[campo.id]));
+  return JSON.stringify({
+    visita: rastreo?.visita ?? "",
+    respondidas,
+    ultimaPregunta: ultima?.id ?? "",
+    contacto: {
+      nombre: valores.nombre,
+      whatsapp: valores.whatsapp,
+      empresaCargo: valores.empresaCargo,
+    },
+    rastreo,
+  });
+}
+
+/** Segundos de cortesía antes de llevar a la persona al grupo. */
+const ESPERA_REDIRECCION = 6;
+
+/** Silencio tras la última tecla antes de reportar el avance. */
+const RETARDO_PROGRESO = 4000;
+
 type Estado = "editando" | "enviando" | "recibido";
 
 export default function Formulario() {
@@ -37,6 +70,7 @@ export default function Formulario() {
   // una ref y no en estado. Se resuelve ya montado, que necesita URL y
   // referrer del navegador.
   const rastreo = useRef<Rastreo | null>(null);
+  const [cuenta, setCuenta] = useState(ESPERA_REDIRECCION);
 
   useEffect(() => {
     abierto.current = Date.now();
@@ -47,6 +81,62 @@ export default function Formulario() {
     () => CAMPOS.filter((campo) => estaRespondido(campo, valores[campo.id])).length,
     [valores],
   );
+
+  const ultimoAvisado = useRef(-1);
+
+  // Quien abandona no avisa: se reporta el avance mientras llena, para poder
+  // reconocerlo después. Solo cuenta y última pregunta, no las respuestas.
+  // El efecto se reinicia con cada tecla, así que espera a que la persona
+  // deje de escribir y manda el estado más reciente.
+  useEffect(() => {
+    if (estado !== "editando" || respondidas === 0) return;
+    if (respondidas === ultimoAvisado.current) return;
+
+    const temporizador = setTimeout(() => {
+      ultimoAvisado.current = respondidas;
+      fetch("/api/progreso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: armarProgreso(valores, respondidas, rastreo.current),
+        keepalive: true,
+      }).catch(() => {
+        // El avance es información secundaria: si falla, no molestamos.
+        ultimoAvisado.current = -1;
+      });
+    }, RETARDO_PROGRESO);
+
+    return () => clearTimeout(temporizador);
+  }, [respondidas, estado, valores]);
+
+  // Al cerrar o cambiar de pestaña se manda lo último, que es justo el
+  // momento en que se pierde a la gente. sendBeacon sobrevive al cierre.
+  useEffect(() => {
+    if (estado !== "editando") return;
+    const alOcultar = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (respondidas === 0 || respondidas === ultimoAvisado.current) return;
+      ultimoAvisado.current = respondidas;
+      navigator.sendBeacon?.(
+        "/api/progreso",
+        new Blob([armarProgreso(valores, respondidas, rastreo.current)], {
+          type: "application/json",
+        }),
+      );
+    };
+    document.addEventListener("visibilitychange", alOcultar);
+    return () => document.removeEventListener("visibilitychange", alOcultar);
+  }, [estado, respondidas, valores]);
+
+  // Cuenta regresiva hacia el grupo de WhatsApp.
+  useEffect(() => {
+    if (estado !== "recibido" || !GRUPO) return;
+    if (cuenta <= 0) {
+      window.location.href = GRUPO;
+      return;
+    }
+    const temporizador = setTimeout(() => setCuenta((n) => n - 1), 1000);
+    return () => clearTimeout(temporizador);
+  }, [estado, cuenta]);
 
   function cambiar(campo: Campo, entrada: string) {
     const valor = campo.tipo === "pesos" ? formatearPesos(entrada) : entrada;
@@ -131,8 +221,26 @@ export default function Formulario() {
           Ya tenemos tus once respuestas. Las leemos una por una y te escribimos
           al WhatsApp que dejaste.
         </p>
-        <div className="recibido-linea" />
-        <p>Si en 48 horas no sabes de nosotros, escríbenos tú.</p>
+
+        {GRUPO ? (
+          <>
+            <div className="recibido-linea" />
+            <p>
+              Falta un paso: entra al grupo. Ahí anunciamos a quien se lo lleva.
+            </p>
+            <a className="boton boton-grupo" href={GRUPO}>
+              Entrar al grupo de WhatsApp
+            </a>
+            <p className="pie-nota" aria-live="polite">
+              Te llevamos automáticamente en {cuenta}…
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="recibido-linea" />
+            <p>Si en 48 horas no sabes de nosotros, escríbenos tú.</p>
+          </>
+        )}
       </div>
     );
   }

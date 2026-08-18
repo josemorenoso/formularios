@@ -17,6 +17,7 @@ import { CANAL_ETIQUETA, normalizarCanal, type Canal } from "@/lib/rastreo";
 type Cuerpo = {
   respuestas?: Record<string, string>;
   rastreo?: {
+    visita?: string;
     canal?: string;
     canalCrudo?: string;
     deteccion?: string;
@@ -84,6 +85,10 @@ export async function POST(peticion: Request) {
   }
 
   const registro = {
+    // n8n enruta por este campo: "completado" cierra la fila de progreso
+    // que dejó abierta /api/progreso con la misma `visita`.
+    evento: "completado" as const,
+    visita: cuerpo.rastreo?.visita ?? "",
     recibido: new Date().toISOString(),
     canal,
     canalLegible: CANAL_ETIQUETA[canal],

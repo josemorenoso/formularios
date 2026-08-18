@@ -108,48 +108,145 @@ Solo la primera es automática:
 1. **Logs de Vercel** — siempre. Cada envío se imprime como una línea
    `[lead] {...}` en JSON. Es la copia de seguridad: nunca se pierde un lead
    aunque falle todo lo demás.
-2. **`LEAD_WEBHOOK_URL`** — recibe el JSON por POST. Sirve n8n, Make, Zapier
-   o un Google Apps Script.
+2. **`LEAD_WEBHOOK_URL`** — recibe el JSON por POST. Aquí va n8n.
 3. **`RESEND_API_KEY` + `LEAD_EMAIL_TO`** — aviso por correo con las
    respuestas en texto plano.
 
 Copia `.env.example` a `.env.local` para desarrollo.
 
-### Tabla en Google Sheets en cinco minutos
+### Los dos eventos
 
-Es la vía más rápida para tener la comparación por canal sin base de datos.
+Al mismo webhook llegan dos tipos de mensaje. Se distinguen por el campo
+`evento`, y esa es la primera bifurcación del flujo de n8n.
 
-1. Crea una hoja nueva → **Extensiones › Apps Script**.
-2. Pega esto y guarda:
+| `evento` | Cuándo se manda | Para qué sirve |
+| --- | --- | --- |
+| `progreso` | Mientras la persona llena, 4 s después de dejar de escribir, y al cerrar o cambiar de pestaña | Saber quién se quedó a medias y en qué pregunta |
+| `completado` | Al enviar el formulario | La postulación entera |
+
+Ambos traen el mismo campo **`visita`**: es la clave que une el avance de
+alguien con su envío. Si hay `progreso` con una `visita` que nunca llegó como
+`completado`, esa persona abandonó.
+
+El evento `progreso` **no lleva las respuestas largas**, solo cuántas van, en
+cuál se quedó y los datos de contacto que ya haya escrito.
+
+### Montar el flujo en n8n
+
+En [n8n/constelarys-formulario.json](n8n/constelarys-formulario.json) está el
+flujo listo para importar (**Workflows › Import from File**). Son ocho nodos:
+
+```
+Webhook → Switch por evento
+            ├── completado → Code → Sheets "Postulaciones" → IF ManyChat → ManyChat: etiquetar
+            └── progreso   → Code → Sheets "Progreso"
+```
+
+Después de importar hay que completar tres cosas, que a propósito no vienen
+en el archivo:
+
+1. **Credencial de Google Sheets** en los dos nodos de hoja, y volver a elegir
+   el documento desde el selector (el ID viene como
+   `REEMPLAZA_CON_EL_ID_DE_TU_HOJA`).
+2. **Credencial Header Auth** en el nodo de ManyChat:
+   Name `Authorization`, Value `Bearer TU_TOKEN`. El token sale de ManyChat ›
+   Settings › API.
+3. **Copiar la URL de producción del webhook** y ponerla en Vercel como
+   `LEAD_WEBHOOK_URL`.
+
+Los nodos de código arman la fila con los nombres de columna ya escritos y los
+nodos de Sheets usan mapeo automático, así que **los encabezados de la hoja
+tienen que coincidir exactamente**:
+
+- Pestaña `Postulaciones`: Fecha · Canal · Detección · Campaña · ManyChat ID ·
+  Visita · Nombre · WhatsApp · Empresa y cargo · Trabajadores · Qué vende ·
+  Proceso costoso · Intentos previos · Costo mensual · Por qué él ·
+  Quién decide · Plazo
+- Pestaña `Progreso`: Fecha · Visita · Canal · ManyChat ID · Campaña ·
+  Respondidas · Total · Se quedó en · Nombre · WhatsApp · Empresa y cargo
+
+Una tabla dinámica sobre la columna **Canal** de `Postulaciones` responde la
+pregunta del experimento. Otra sobre **Se quedó en** de `Progreso` te dice
+cuál pregunta está espantando gente.
+
+### Alternativa sin n8n
+
+Si prefieres saltarte n8n, un Google Apps Script publicado como aplicación web
+también recibe el POST. Sirve para la hoja, pero no para recuperar a quien
+abandona: eso necesita llamar a la API de ManyChat.
 
 ```js
 function doPost(e) {
-  const hoja = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  const libro = SpreadsheetApp.getActiveSpreadsheet();
   const d = JSON.parse(e.postData.contents);
-
-  if (hoja.getLastRow() === 0) {
-    hoja.appendRow(
-      ["Fecha", "Canal", "Detección", "Campaña"].concat(Object.keys(d.respuestas))
-    );
-  }
-
-  hoja.appendRow(
-    [d.recibido, d.canalLegible, d.deteccion, d.campana || ""]
-      .concat(Object.values(d.respuestas))
+  const hoja = libro.getSheetByName(
+    d.evento === "progreso" ? "Progreso" : "Postulaciones"
   );
 
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok: true }))
+  if (d.evento === "progreso") {
+    hoja.appendRow([d.actualizado, d.visita, d.canalLegible, d.manychatId || "",
+                    d.respondidas, d.ultimaPregunta, d.nombre || "", d.whatsapp || ""]);
+  } else {
+    if (hoja.getLastRow() === 0) {
+      hoja.appendRow(["Fecha", "Canal", "Detección", "Campaña", "ManyChat ID", "Visita"]
+        .concat(Object.keys(d.respuestas)));
+    }
+    hoja.appendRow([d.recibido, d.canalLegible, d.deteccion, d.campana || "",
+                    d.manychatId || "", d.visita].concat(Object.values(d.respuestas)));
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 ```
 
-3. **Implementar › Nueva implementación › Aplicación web**.
-   Ejecutar como *yo*, con acceso para *cualquier usuario*.
-4. Copia la URL que te da y ponla en `LEAD_WEBHOOK_URL`.
+**Implementar › Nueva implementación › Aplicación web**, ejecutar como *yo*,
+acceso para *cualquier usuario*, y esa URL va en `LEAD_WEBHOOK_URL`.
 
-Con eso, una tabla dinámica sobre la columna **Canal** te responde la pregunta:
-cuántos leads trajo cada uno y cómo se ven.
+---
+
+## Recuperar a quien abandona
+
+El recordatorio lo manda **ManyChat**, no este proyecto. La aplicación solo
+avisa quién terminó; ManyChat decide a quién le escribe.
+
+**En ManyChat**, en el flujo que reparte el enlace:
+
+1. Enviar el mensaje con `formulario.constelarys.com/mc?mcid={{user_id}}`.
+   El `mcid` es lo que permite reconocer después al suscriptor.
+2. **Smart Delay** de 2 o 3 horas.
+3. **Condition**: ¿tiene la etiqueta `postulacion-completada`?
+   - Sí → terminar.
+   - No → enviar el recordatorio.
+
+El nodo de n8n pone esa etiqueta en cuanto llega el evento `completado`. Quien
+no la tenga, es porque no terminó.
+
+Dos límites que conviene tener presentes:
+
+- **Solo alcanza a quien llegó por ManyChat.** De los que entran por WhatsApp
+  directo no sabemos quiénes son hasta que envían el formulario, así que no
+  hay a quién escribirle. Es la asimetría que este experimento mide.
+- **Instagram cierra la ventana a las 24 horas.** Meta solo deja escribir
+  dentro de las 24 h desde la última interacción de la persona. Un Smart Delay
+  de 2–3 horas cae cómodo dentro; uno de dos días no se entrega.
+
+Si quieres que el recordatorio diga en qué pregunta se quedó, esa información
+está en la hoja `Progreso`, columna **Se quedó en**.
+
+---
+
+## Al terminar: el grupo de WhatsApp
+
+Pon el enlace de invitación en `NEXT_PUBLIC_WHATSAPP_GRUPO`. La pantalla final
+muestra el botón y redirige sola a los seis segundos.
+
+Dos detalles:
+
+- Es una variable **`NEXT_PUBLIC_`**: se inyecta al compilar. Después de
+  cambiarla en Vercel hay que **volver a desplegar** para que tome efecto.
+- Si se deja vacía no aparece el botón, y la pantalla final vuelve al mensaje
+  normal. Nunca se muestra un enlace roto.
 
 ---
 
@@ -190,19 +287,22 @@ al enviar el formulario.
 
 ```
 app/
-  page.tsx              portada
-  layout.tsx            tipografías y metadatos
-  globals.css           tokens de marca (tinta, oro, marfil)
-  icon.svg              favicon: la estrella polar
-  api/lead/route.ts     recibe, valida y reenvía la postulación
+  page.tsx                portada
+  layout.tsx              tipografías y metadatos
+  globals.css             tokens de marca (tinta, oro, marfil)
+  icon.svg                favicon: la estrella polar
+  api/lead/route.ts       recibe, valida y reenvía la postulación
+  api/progreso/route.ts   avisa que alguien va a medias
 components/
-  Formulario.tsx        las once preguntas y el envío
-  Constelacion.tsx      progreso: una estrella por respuesta
-  Marca.tsx             logo, isotipo y estrella, en vector
+  Formulario.tsx          las once preguntas, el envío y el paso al grupo
+  Constelacion.tsx        progreso: una estrella por respuesta
+  Marca.tsx               logo, isotipo y estrella, en vector
 lib/
-  preguntas.ts          definición de las preguntas y su validación
-  rastreo.ts            detección del canal de origen
-next.config.ts          rutas cortas /mc, /wa, /ig
+  preguntas.ts            definición de las preguntas y su validación
+  rastreo.ts              detección del canal de origen
+n8n/
+  constelarys-formulario.json   flujo listo para importar
+next.config.ts            rutas cortas /mc, /wa, /ig
 ```
 
 ## Cambiar las preguntas

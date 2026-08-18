@@ -1,0 +1,219 @@
+{
+  "name": "Constelarys · Formulario de postulación",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "constelarys-formulario",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-formulario",
+      "name": "Formulario",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-460, 300],
+      "webhookId": "constelarys-formulario",
+      "notes": "Pega esta URL en Vercel como LEAD_WEBHOOK_URL. Responde de inmediato: la persona no debe esperar a que se escriba la hoja."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "es-completado",
+                    "leftValue": "={{ $json.body.evento }}",
+                    "rightValue": "completado",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "completado"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "es-progreso",
+                    "leftValue": "={{ $json.body.evento }}",
+                    "rightValue": "progreso",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "progreso"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-evento",
+      "name": "¿Completado o progreso?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [-240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Una fila por postulación, con los nombres de columna ya puestos.\n// El nodo de Sheets mapea automáticamente por nombre, así que estas\n// claves deben coincidir con los encabezados de la hoja.\nconst d = $input.first().json.body;\nconst r = d.respuestas || {};\n\nreturn [{\n  json: {\n    'Fecha': d.recibido,\n    'Canal': d.canalLegible,\n    'Detección': d.deteccion,\n    'Campaña': d.campana || '',\n    'ManyChat ID': d.manychatId || '',\n    'Visita': d.visita || '',\n    'Nombre': d.nombre,\n    'WhatsApp': d.whatsapp,\n    'Empresa y cargo': d.empresaCargo,\n    'Trabajadores': r['Cantidad de trabajadores'] || '',\n    'Qué vende': r['¿Qué vende tu empresa y cómo te llegan hoy los clientes?'] || '',\n    'Proceso costoso': r['¿Cuál es el proceso que más tiempo o plata te está costando hoy?'] || '',\n    'Intentos previos': r['¿Has intentado resolverlo antes? ¿Con qué?'] || '',\n    'Costo mensual': d.costoMensualPesos || '',\n    'Por qué él': r['¿Por qué deberías ganártelo tú?'] || '',\n    'Quién decide': r['¿La decisión de contratar algo así la tomas tú solo o hay alguien más?'] || '',\n    'Plazo': r['¿Para cuándo necesitas esto resuelto?'] || ''\n  }\n}];"
+      },
+      "id": "code-postulacion",
+      "name": "Armar fila de postulación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [20, 180]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REEMPLAZA_CON_EL_ID_DE_TU_HOJA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Postulaciones",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "sheets-postulaciones",
+      "name": "Hoja · Postulaciones",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [240, 180],
+      "notes": "Vuelve a elegir el documento y la pestaña desde el selector después de importar."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "tiene-manychat",
+              "leftValue": "={{ $('Formulario').item.json.body.manychatId }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-manychat",
+      "name": "¿Vino de ManyChat?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.manychat.com/fb/subscriber/addTagByName",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ subscriber_id: $('Formulario').item.json.body.manychatId, tag_name: 'postulacion-completada' }) }}",
+        "options": {}
+      },
+      "id": "manychat-etiqueta",
+      "name": "ManyChat · marcar completado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 180],
+      "notes": "Credencial Header Auth: Name = Authorization, Value = Bearer TU_TOKEN_MANYCHAT. Esta etiqueta es la que apaga el recordatorio en el flujo de ManyChat."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Una fila por avance. Sirve para dos cosas: saber en qué pregunta se\n// cae la gente, y tener a quién recuperar si nunca llegó el completado.\nconst d = $input.first().json.body;\n\nreturn [{\n  json: {\n    'Fecha': d.actualizado,\n    'Visita': d.visita,\n    'Canal': d.canalLegible,\n    'ManyChat ID': d.manychatId || '',\n    'Campaña': d.campana || '',\n    'Respondidas': d.respondidas,\n    'Total': d.total,\n    'Se quedó en': d.ultimaPregunta,\n    'Nombre': d.nombre || '',\n    'WhatsApp': d.whatsapp || '',\n    'Empresa y cargo': d.empresaCargo || ''\n  }\n}];"
+      },
+      "id": "code-progreso",
+      "name": "Armar fila de progreso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [20, 420]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REEMPLAZA_CON_EL_ID_DE_TU_HOJA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Progreso",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "sheets-progreso",
+      "name": "Hoja · Progreso",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [240, 420]
+    }
+  ],
+  "connections": {
+    "Formulario": {
+      "main": [[{ "node": "¿Completado o progreso?", "type": "main", "index": 0 }]]
+    },
+    "¿Completado o progreso?": {
+      "main": [
+        [{ "node": "Armar fila de postulación", "type": "main", "index": 0 }],
+        [{ "node": "Armar fila de progreso", "type": "main", "index": 0 }]
+      ]
+    },
+    "Armar fila de postulación": {
+      "main": [[{ "node": "Hoja · Postulaciones", "type": "main", "index": 0 }]]
+    },
+    "Hoja · Postulaciones": {
+      "main": [[{ "node": "¿Vino de ManyChat?", "type": "main", "index": 0 }]]
+    },
+    "¿Vino de ManyChat?": {
+      "main": [[{ "node": "ManyChat · marcar completado", "type": "main", "index": 0 }], []]
+    },
+    "Armar fila de progreso": {
+      "main": [[{ "node": "Hoja · Progreso", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}
