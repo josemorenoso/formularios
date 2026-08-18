@@ -13,11 +13,26 @@ Todo el rastreo se apoya en qué enlace comparte cada canal. Son estos:
 
 | Dónde lo pegas | Enlace | Se registra como |
 | --- | --- | --- |
-| Botón o mensaje de ManyChat | `tu-dominio.com/mc` | ManyChat |
-| Chat de WhatsApp, mensaje manual | `tu-dominio.com/wa` | WhatsApp directo |
-| Bio e historias de Instagram | `tu-dominio.com/ig` | Instagram |
+| Botón o mensaje de ManyChat | `postula.constelarys.com/mc` | ManyChat |
+| Chat de WhatsApp, mensaje manual | `postula.constelarys.com/wa` | WhatsApp directo |
+| Bio e historias de Instagram | `postula.constelarys.com/ig` | Instagram |
 
 No hace falta más. Cada ruta redirige a la portada marcando el origen.
+
+### Si prefieres un subdominio por canal
+
+También funciona apuntar varios subdominios al mismo proyecto. El canal se
+deduce del subdominio, sin necesidad de la ruta:
+
+| Subdominio | Se registra como |
+| --- | --- |
+| `mc.constelarys.com` | ManyChat |
+| `wa.constelarys.com` | WhatsApp directo |
+| `ig.constelarys.com` | Instagram |
+
+La coincidencia es exacta: `postula.` o un dominio de vista previa como
+`mc-algo.vercel.app` no cuentan como canal. Un parámetro en la URL siempre
+gana sobre el subdominio, por si necesitas corregir el origen a mano.
 
 Si prefieres enlaces largos, también funcionan a mano:
 `tu-dominio.com/?src=manychat`, `?src=wa`, `?utm_source=manychat`, `?origen=whatsapp`.
@@ -32,14 +47,16 @@ Si prefieres enlaces largos, también funcionan a mano:
 
 ## Cómo decide el canal
 
-Tres intentos, en orden. El primer resultado manda:
+Cuatro intentos, en orden. El primer resultado manda:
 
 1. **Parámetro en la URL** — `src`, `source`, `utm_source`, `fuente`, `origen`,
    `canal` o `ref`. Es el método confiable y el que usan las rutas cortas.
-2. **Página que la trajo** — si no vino parámetro, mira el referente:
+2. **Subdominio** — `wa.constelarys.com` y `mc.constelarys.com`, por
+   coincidencia exacta.
+3. **Página que la trajo** — si no vino nada de lo anterior, mira el referente:
    `wa.me` y `whatsapp.com` cuentan como WhatsApp; `m.me`, `manychat.com` y
    `mnch.at` como ManyChat.
-3. **Lo guardado en la sesión** — si ya se resolvió en esta visita, se
+4. **Lo guardado en la sesión** — si ya se resolvió en esta visita, se
    conserva. Recargar la página o volver atrás no borra el origen.
 
 Si nada da resultado, el lead se guarda como `otro` en vez de inventar un canal.

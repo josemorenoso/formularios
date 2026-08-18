@@ -5,8 +5,9 @@
  * WhatsApp directo? Se resuelve en tres intentos, en este orden:
  *
  *   1. Parámetro en la URL  (?src=manychat, ?utm_source=wa, ?origen=...)
- *   2. Página que la trajo  (wa.me → WhatsApp, m.me → ManyChat)
- *   3. Lo guardado en la sesión, si ya se resolvió antes en esta visita
+ *   2. Subdominio          (wa.constelarys.com → WhatsApp)
+ *   3. Página que la trajo (wa.me → WhatsApp, m.me → ManyChat)
+ *   4. Lo guardado en la sesión, si ya se resolvió antes en esta visita
  *
  * El primer contacto manda: una vez resuelto, se guarda y no se sobreescribe,
  * para que recargar la página o volver atrás no ensucie el dato.
@@ -21,7 +22,7 @@ export const CANAL_ETIQUETA: Record<Canal, string> = {
   otro: "Sin identificar",
 };
 
-export type Deteccion = "parametro" | "referente" | "sin-dato";
+export type Deteccion = "parametro" | "subdominio" | "referente" | "sin-dato";
 
 export type Rastreo = {
   canal: Canal;
@@ -158,6 +159,20 @@ export function resolverRastreo(): Rastreo {
       break;
     }
     if (valor && !canalCrudo) canalCrudo = `${clave}=${valor}`;
+  }
+
+  // Subdominio dedicado: wa.constelarys.com, mc.constelarys.com. Va antes
+  // que el referente porque no depende de lo que mande el navegador.
+  if (!canal) {
+    // Coincidencia exacta, no por prefijo: un dominio de vista previa como
+    // "mc-algo.vercel.app" no debe contarse como ManyChat.
+    const subdominio = window.location.hostname.split(".")[0].toLowerCase();
+    const porHost = ALIAS[subdominio] ?? null;
+    if (porHost) {
+      canal = porHost;
+      canalCrudo = window.location.hostname;
+      deteccion = "subdominio";
+    }
   }
 
   if (!canal) {
