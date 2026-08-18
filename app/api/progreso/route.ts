@@ -71,15 +71,20 @@ export async function POST(peticion: Request) {
   const webhook = process.env.LEAD_WEBHOOK_URL;
   if (webhook) {
     try {
-      await fetch(webhook, {
+      const respuesta = await fetch(webhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(registro),
         signal: AbortSignal.timeout(ESPERA_MS),
       });
-    } catch {
+      if (!respuesta.ok) {
+        console.warn(`[progreso] el webhook respondió HTTP ${respuesta.status}`);
+      }
+    } catch (error) {
       // Un progreso perdido no es grave: el siguiente lo reemplaza.
-      console.warn("[progreso] el webhook no respondió");
+      console.warn(
+        `[progreso] el webhook no respondió · ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

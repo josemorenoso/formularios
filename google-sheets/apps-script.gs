@@ -58,6 +58,21 @@ function doPost(e) {
   }
 }
 
+/**
+ * Prueba de un clic: abre la URL que termina en /exec en una ventana de
+ * incógnito.
+ *
+ *   Ves {"ok":true,...}          → quedó bien publicado.
+ *   Te pide iniciar sesión       → "Quién tiene acceso" NO está en
+ *                                  "Cualquier usuario". Ese es el problema.
+ */
+function doGet() {
+  return respuesta_({
+    ok: true,
+    mensaje: "El script está publicado y acepta peticiones sin iniciar sesión."
+  });
+}
+
 /** Devuelve la pestaña, creándola con encabezados si aún no existe. */
 function hojaCon_(libro, nombre, encabezados) {
   var hoja = libro.getSheetByName(nombre);

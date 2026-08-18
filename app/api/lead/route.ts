@@ -127,9 +127,11 @@ export async function POST(peticion: Request) {
         body: JSON.stringify(registro),
       }),
     );
-    if (!enviado) {
+    if (!enviado.bien) {
       advertencia = "webhook";
-      console.error("[lead] el webhook no respondió; el lead quedó solo en logs");
+      console.error(
+        `[lead] el webhook falló: ${enviado.motivo} · el lead quedó solo en logs`,
+      );
     }
   }
 
@@ -151,26 +153,48 @@ export async function POST(peticion: Request) {
         }),
       }),
     );
-    if (!enviado) {
+    if (!enviado.bien) {
       advertencia = advertencia ?? "correo";
-      console.error("[lead] no se pudo enviar el correo de aviso");
+      console.error(`[lead] no se pudo enviar el correo: ${enviado.motivo}`);
     }
   }
 
   return NextResponse.json({ ok: true, canal, advertencia });
 }
 
-/** Un reintento y listo: la persona está esperando del otro lado. */
+/**
+ * Un reintento y listo: la persona está esperando del otro lado.
+ *
+ * Devuelve el motivo del fallo, no solo que falló. Sin el código de estado
+ * y un pedazo de la respuesta, diagnosticar por qué no llega nada a la hoja
+ * es adivinar: 401 y 403 son permisos, 404 es la URL, y un 200 con HTML
+ * suele ser la pantalla de acceso de Google haciéndose pasar por éxito.
+ */
 async function reintentar(accion: () => Promise<Response>) {
+  let motivo = "sin respuesta";
+
   for (let intento = 0; intento < 2; intento++) {
     try {
       const respuesta = await accion();
-      if (respuesta.ok) return true;
-    } catch {
-      // Se reintenta abajo.
+      const tipo = respuesta.headers.get("content-type") ?? "";
+
+      if (respuesta.ok && !tipo.includes("text/html")) {
+        return { bien: true as const, motivo: "" };
+      }
+
+      const cuerpo = (await respuesta.text().catch(() => "")).slice(0, 180);
+
+      // Apps Script responde 200 con HTML cuando el acceso no está en
+      // "Cualquier usuario": es un inicio de sesión, no un guardado.
+      motivo = respuesta.ok
+        ? `respondió ${respuesta.status} con HTML (¿el acceso del script no está en "Cualquier usuario"?) · ${cuerpo}`
+        : `HTTP ${respuesta.status} · ${cuerpo}`;
+    } catch (error) {
+      motivo = `no se pudo conectar · ${error instanceof Error ? error.message : String(error)}`;
     }
   }
-  return false;
+
+  return { bien: false as const, motivo };
 }
 
 function correoEnTexto(registro: {
