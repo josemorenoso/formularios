@@ -13,35 +13,66 @@ Todo el rastreo se apoya en qué enlace comparte cada canal. Son estos:
 
 | Dónde lo pegas | Enlace | Se registra como |
 | --- | --- | --- |
-| Botón o mensaje de ManyChat | `postula.constelarys.com/mc` | ManyChat |
-| Chat de WhatsApp, mensaje manual | `postula.constelarys.com/wa` | WhatsApp directo |
-| Bio e historias de Instagram | `postula.constelarys.com/ig` | Instagram |
+| Botón o mensaje de ManyChat | `formulario.constelarys.com/mc` | ManyChat |
+| Chat de WhatsApp, mensaje manual | `formulario.constelarys.com/wa` | WhatsApp directo |
+| Bio e historias de Instagram | `formulario.constelarys.com/ig` | Instagram |
 
-No hace falta más. Cada ruta redirige a la portada marcando el origen.
+> **`/mc`, `/wa` y `/ig` no se configuran en el DNS.** Son rutas de esta
+> aplicación, ya escritas en [next.config.ts](next.config.ts), igual que
+> `/contacto` en cualquier web. En el proveedor de dominio solo creas el
+> subdominio; las rutas funcionan solas desde el primer despliegue.
 
-### Si prefieres un subdominio por canal
-
-También funciona apuntar varios subdominios al mismo proyecto. El canal se
-deduce del subdominio, sin necesidad de la ruta:
-
-| Subdominio | Se registra como |
-| --- | --- |
-| `mc.constelarys.com` | ManyChat |
-| `wa.constelarys.com` | WhatsApp directo |
-| `ig.constelarys.com` | Instagram |
-
-La coincidencia es exacta: `postula.` o un dominio de vista previa como
-`mc-algo.vercel.app` no cuentan como canal. Un parámetro en la URL siempre
-gana sobre el subdominio, por si necesitas corregir el origen a mano.
+Cada ruta redirige a la portada marcando el origen. Puedes probarlas ya en la
+URL provisional de Vercel: al abrir `…vercel.app/wa` la barra de direcciones
+cambia sola a `…/?src=whatsapp`.
 
 Si prefieres enlaces largos, también funcionan a mano:
-`tu-dominio.com/?src=manychat`, `?src=wa`, `?utm_source=manychat`, `?origen=whatsapp`.
+`formulario.constelarys.com/?src=manychat`, `?src=wa`, `?utm_source=manychat`,
+`?origen=whatsapp`.
 
 **En ManyChat**, para saber además qué suscriptor era, agrega su id:
-`tu-dominio.com/mc?mcid={{user_id}}`. Llega en el campo `manychatId`.
+`formulario.constelarys.com/mc?mcid={{user_id}}`. Llega en el campo `manychatId`.
 
 **Para separar campañas** dentro del mismo canal:
-`tu-dominio.com/mc?utm_campaign=historia-agosto`.
+`formulario.constelarys.com/mc?utm_campaign=historia-agosto`.
+
+---
+
+## Conectar el subdominio
+
+Dos pasos, un solo registro DNS.
+
+**1. En Vercel** — Settings › Domains › Add › `formulario.constelarys.com`.
+Ahí te muestra el valor exacto del CNAME que necesitas.
+
+**2. En tu proveedor de dominio** (Namecheap: Domain List › Manage ›
+Advanced DNS › Add New Record):
+
+| Type | Host | Value | TTL |
+| --- | --- | --- | --- |
+| CNAME Record | `formulario` | el valor que mostró Vercel | Automatic |
+
+En **Host** va solo `formulario`, no el dominio completo: el proveedor le pega
+`constelarys.com` por su cuenta.
+
+Tres advertencias:
+
+- El valor del CNAME **lo dicta Vercel**, no este README. Suele ser
+  `cname.vercel-dns.com`, pero cambia según la cuenta. Usa el que te muestre.
+- `constelarys.com` no se toca. Solo agregas un subdominio; la web principal
+  sigue igual.
+- Si el DNS está en Cloudflare, el registro debe quedar en *DNS only*
+  (nube gris). Con el proxy activado falla la verificación de Vercel.
+
+### Opcional: un subdominio por canal
+
+No hace falta, pero si quieres enlaces más cortos puedes apuntar varios
+subdominios al mismo proyecto —un CNAME por cada uno— y el canal sale del
+subdominio, sin la ruta: `mc.`, `wa.` e `ig.`
+
+La coincidencia es exacta: `formulario.` o un dominio de vista previa como
+`mc-algo.vercel.app` no cuentan como canal. Un parámetro en la URL siempre
+gana sobre el subdominio, por si necesitas corregir el origen a mano.
 
 ---
 
@@ -51,8 +82,8 @@ Cuatro intentos, en orden. El primer resultado manda:
 
 1. **Parámetro en la URL** — `src`, `source`, `utm_source`, `fuente`, `origen`,
    `canal` o `ref`. Es el método confiable y el que usan las rutas cortas.
-2. **Subdominio** — `wa.constelarys.com` y `mc.constelarys.com`, por
-   coincidencia exacta.
+2. **Subdominio** — solo si creaste `wa.constelarys.com` o
+   `mc.constelarys.com`, por coincidencia exacta.
 3. **Página que la trajo** — si no vino nada de lo anterior, mira el referente:
    `wa.me` y `whatsapp.com` cuentan como WhatsApp; `m.me`, `manychat.com` y
    `mnch.at` como ManyChat.
