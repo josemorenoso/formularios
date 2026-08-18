@@ -13,9 +13,9 @@ Todo el rastreo se apoya en qué enlace comparte cada canal. Son estos:
 
 | Dónde lo pegas | Enlace | Se registra como |
 | --- | --- | --- |
-| Botón o mensaje de ManyChat | `formulario.constelarys.com/mc` | ManyChat |
-| Chat de WhatsApp, mensaje manual | `formulario.constelarys.com/wa` | WhatsApp directo |
-| Bio e historias de Instagram | `formulario.constelarys.com/ig` | Instagram |
+| Botón o mensaje de ManyChat | `convocatoria.constelarys.com/mc` | ManyChat |
+| Chat de WhatsApp, mensaje manual | `convocatoria.constelarys.com/wa` | WhatsApp directo |
+| Bio e historias de Instagram | `convocatoria.constelarys.com/ig` | Instagram |
 
 > **`/mc`, `/wa` y `/ig` no se configuran en el DNS.** Son rutas de esta
 > aplicación, ya escritas en [next.config.ts](next.config.ts), igual que
@@ -27,14 +27,14 @@ URL provisional de Vercel: al abrir `…vercel.app/wa` la barra de direcciones
 cambia sola a `…/?src=whatsapp`.
 
 Si prefieres enlaces largos, también funcionan a mano:
-`formulario.constelarys.com/?src=manychat`, `?src=wa`, `?utm_source=manychat`,
+`convocatoria.constelarys.com/?src=manychat`, `?src=wa`, `?utm_source=manychat`,
 `?origen=whatsapp`.
 
 **En ManyChat**, para saber además qué suscriptor era, agrega su id:
-`formulario.constelarys.com/mc?mcid={{user_id}}`. Llega en el campo `manychatId`.
+`convocatoria.constelarys.com/mc?mcid={{user_id}}`. Llega en el campo `manychatId`.
 
 **Para separar campañas** dentro del mismo canal:
-`formulario.constelarys.com/mc?utm_campaign=historia-agosto`.
+`convocatoria.constelarys.com/mc?utm_campaign=historia-agosto`.
 
 ---
 
@@ -42,7 +42,7 @@ Si prefieres enlaces largos, también funcionan a mano:
 
 Dos pasos, un solo registro DNS.
 
-**1. En Vercel** — Settings › Domains › Add › `formulario.constelarys.com`.
+**1. En Vercel** — Settings › Domains › Add › `convocatoria.constelarys.com`.
 Ahí te muestra el valor exacto del CNAME que necesitas.
 
 **2. En tu proveedor de dominio** (Namecheap: Domain List › Manage ›
@@ -50,9 +50,9 @@ Advanced DNS › Add New Record):
 
 | Type | Host | Value | TTL |
 | --- | --- | --- | --- |
-| CNAME Record | `formulario` | el valor que mostró Vercel | Automatic |
+| CNAME Record | `convocatoria` | el valor que mostró Vercel | Automatic |
 
-En **Host** va solo `formulario`, no el dominio completo: el proveedor le pega
+En **Host** va solo `convocatoria`, no el dominio completo: el proveedor le pega
 `constelarys.com` por su cuenta.
 
 Tres advertencias:
@@ -169,39 +169,41 @@ Una tabla dinámica sobre la columna **Canal** de `Postulaciones` responde la
 pregunta del experimento. Otra sobre **Se quedó en** de `Progreso` te dice
 cuál pregunta está espantando gente.
 
-### Alternativa sin n8n
+### Opción rápida: Google Sheets sin n8n
 
-Si prefieres saltarte n8n, un Google Apps Script publicado como aplicación web
-también recibe el POST. Sirve para la hoja, pero no para recuperar a quien
-abandona: eso necesita llamar a la API de ManyChat.
+La forma más corta de tener los datos guardados hoy mismo. Después puedes
+cambiar a n8n sin tocar código: solo cambias `LEAD_WEBHOOK_URL`.
 
-```js
-function doPost(e) {
-  const libro = SpreadsheetApp.getActiveSpreadsheet();
-  const d = JSON.parse(e.postData.contents);
-  const hoja = libro.getSheetByName(
-    d.evento === "progreso" ? "Progreso" : "Postulaciones"
-  );
+El script está en [google-sheets/apps-script.gs](google-sheets/apps-script.gs).
+Crea las pestañas y los encabezados solo, así que no hay que preparar nada
+en la hoja.
 
-  if (d.evento === "progreso") {
-    hoja.appendRow([d.actualizado, d.visita, d.canalLegible, d.manychatId || "",
-                    d.respondidas, d.ultimaPregunta, d.nombre || "", d.whatsapp || ""]);
-  } else {
-    if (hoja.getLastRow() === 0) {
-      hoja.appendRow(["Fecha", "Canal", "Detección", "Campaña", "ManyChat ID", "Visita"]
-        .concat(Object.keys(d.respuestas)));
-    }
-    hoja.appendRow([d.recibido, d.canalLegible, d.deteccion, d.campana || "",
-                    d.manychatId || "", d.visita].concat(Object.values(d.respuestas)));
-  }
+1. Entra a [sheets.new](https://sheets.new) — crea una hoja en blanco.
+   Ponle nombre, por ejemplo *Constelarys · Postulaciones*.
+2. Menú **Extensiones › Apps Script**. Se abre otra pestaña del navegador.
+3. Borra el `function myFunction() {}` que viene y pega **todo** el contenido
+   de `apps-script.gs`. Guarda con el icono del disquete o Ctrl+S.
+4. Botón azul **Implementar › Nueva implementación**.
+5. Al lado de *Seleccionar tipo*, dale al **engranaje** y elige
+   **Aplicación web**.
+6. Rellena así:
+   - *Ejecutar como*: *Yo*
+   - *Quién tiene acceso*: **Cualquier usuario** ← el que más se equivoca
+7. **Implementar**. Pide permisos: *Revisar permisos* → tu cuenta → aparece
+   una pantalla roja que dice que Google no ha verificado la app. Es normal,
+   la app es tuya: **Configuración avanzada › Ir a (nombre) (no seguro)** →
+   **Permitir**.
+8. Copia la **URL de la aplicación web** (termina en `/exec`).
+9. En Vercel: *Settings › Environment Variables* → `LEAD_WEBHOOK_URL` con esa
+   URL → *Deployments › ⋯ › Redeploy*.
 
-  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-```
+Para comprobarlo sin esperar a nadie: en el editor de Apps Script elige la
+función `probar` en el desplegable de arriba y dale **Ejecutar**. Debe
+aparecer una fila de mentiras en la pestaña *Postulaciones*; bórrala a mano.
 
-**Implementar › Nueva implementación › Aplicación web**, ejecutar como *yo*,
-acceso para *cualquier usuario*, y esa URL va en `LEAD_WEBHOOK_URL`.
+> Si más adelante editas el script, hay que hacer **Implementar › Gestionar
+> implementaciones › editar › Versión: Nueva** para que los cambios salgan en
+> vivo. La URL no cambia.
 
 ---
 
@@ -212,7 +214,7 @@ avisa quién terminó; ManyChat decide a quién le escribe.
 
 **En ManyChat**, en el flujo que reparte el enlace:
 
-1. Enviar el mensaje con `formulario.constelarys.com/mc?mcid={{user_id}}`.
+1. Enviar el mensaje con `convocatoria.constelarys.com/mc?mcid={{user_id}}`.
    El `mcid` es lo que permite reconocer después al suscriptor.
 2. **Smart Delay** de 2 o 3 horas.
 3. **Condition**: ¿tiene la etiqueta `postulacion-completada`?
@@ -300,6 +302,8 @@ components/
 lib/
   preguntas.ts            definición de las preguntas y su validación
   rastreo.ts              detección del canal de origen
+google-sheets/
+  apps-script.gs                recibe los datos en una hoja, sin n8n
 n8n/
   constelarys-formulario.json   flujo listo para importar
 next.config.ts            rutas cortas /mc, /wa, /ig
