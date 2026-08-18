@@ -1,26 +1,671 @@
 @import "tailwindcss";
 
+/* ────────────────────────────────────────────────────────────
+   CONSTELARYS · tokens de marca
+   Tinta, oro y marfil, tal como están en el manual.
+   ──────────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --tinta-900: #060d18;
+  --tinta-800: #0a1423;
+  --tinta-700: #0f1d31;
+  --tinta-600: #16273f;
+
+  --oro: #c9a24a;
+  --oro-claro: #e7c87c;
+  --oro-tenue: rgba(201, 162, 74, 0.16);
+
+  --marfil: #f3eee3;
+  --humo: #8d97a9;
+  --humo-tenue: #5d6779;
+
+  --linea: rgba(243, 238, 227, 0.1);
+  --linea-fuerte: rgba(243, 238, 227, 0.2);
+
+  --alerta: #e2795f;
+
+  --fuente-display: var(--font-display), Georgia, "Times New Roman", serif;
+  --fuente-texto: var(--font-texto), ui-sans-serif, system-ui, sans-serif;
+
+  --ancho-contenido: 1180px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--tinta-900);
+  color: var(--marfil);
+  font-family: var(--fuente-texto);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Campo estelar: dos capas de puntos muy tenues, sin imágenes. */
+.cielo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(243, 238, 227, 0.5), transparent),
+    radial-gradient(1px 1px at 78% 9%, rgba(243, 238, 227, 0.35), transparent),
+    radial-gradient(1px 1px at 34% 62%, rgba(243, 238, 227, 0.3), transparent),
+    radial-gradient(1px 1px at 91% 48%, rgba(201, 162, 74, 0.45), transparent),
+    radial-gradient(1px 1px at 57% 88%, rgba(243, 238, 227, 0.28), transparent),
+    radial-gradient(1px 1px at 22% 91%, rgba(243, 238, 227, 0.22), transparent),
+    radial-gradient(1px 1px at 66% 34%, rgba(243, 238, 227, 0.3), transparent),
+    radial-gradient(900px 620px at 82% -10%, rgba(22, 39, 63, 0.75), transparent 70%),
+    radial-gradient(700px 520px at 0% 100%, rgba(15, 29, 49, 0.6), transparent 70%);
+}
+
+.capa {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Tipografía utilitaria ─────────────────────────────────── */
+.rotulo {
+  font-family: var(--fuente-texto);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--humo);
+}
+
+.display {
+  font-family: var(--fuente-display);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+
+/* ── Encabezado ────────────────────────────────────────────── */
+.barra {
+  position: relative;
+  z-index: 3;
+  border-bottom: 1px solid var(--linea);
+  background-color: rgba(6, 13, 24, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+.barra-interior {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: var(--ancho-contenido);
+  margin: 0 auto;
+  padding: 18px 24px;
+}
+
+/* En pantallas angostas el logo se queda solo: el rótulo no cabe. */
+@media (max-width: 700px) {
+  .barra-interior .rotulo {
+    display: none;
+  }
+}
+
+/* ── Rejilla principal ─────────────────────────────────────── */
+.lienzo {
+  max-width: var(--ancho-contenido);
+  margin: 0 auto;
+  padding: 0 24px 96px;
+}
+
+.rejilla {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+}
+
+/* Sin esto la columna no puede encogerse por debajo del ancho mínimo de
+   su contenido, y la opción más larga de un <select> estira la página. */
+.rejilla > * {
+  min-width: 0;
+}
+
+@media (min-width: 1000px) {
+  .rejilla {
+    grid-template-columns: 400px 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+}
+
+.riel {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  .riel {
+    display: block;
+    position: sticky;
+    top: 40px;
+    padding-top: 72px;
+  }
+}
+
+.riel-titulo {
+  font-family: var(--fuente-display);
+  font-size: clamp(40px, 3.6vw, 56px);
+  font-weight: 400;
+  line-height: 1.03;
+  letter-spacing: -0.02em;
+  margin: 22px 0 20px;
+  color: var(--marfil);
+}
+
+.riel-titulo em {
+  font-style: italic;
+  color: var(--oro-claro);
+}
+
+.riel-texto {
+  color: var(--humo);
+  font-size: 15px;
+  max-width: 34ch;
+  margin: 0 0 36px;
+}
+
+.riel-nota {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--linea);
+  color: var(--humo-tenue);
+  font-size: 13px;
+  max-width: 34ch;
+}
+
+/* ── Encabezado móvil del formulario ───────────────────────── */
+.movil {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  margin-bottom: 8px;
+  background-color: rgba(6, 13, 24, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--linea);
+}
+
+@media (min-width: 1000px) {
+  .movil {
+    display: none;
+  }
+}
+
+.movil-riel {
+  position: relative;
+  flex: 1 1 auto;
+  height: 2px;
+  background-color: var(--linea-fuerte);
+  border-radius: 2px;
+}
+
+.movil-riel-lleno {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  background-color: var(--oro);
+  border-radius: 2px;
+  transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.movil-cuenta {
+  min-width: 0;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--humo);
+  white-space: nowrap;
+}
+
+.movil-cuenta b {
+  color: var(--oro-claro);
+  font-weight: 600;
+}
+
+/* ── Intro móvil ───────────────────────────────────────────── */
+.intro-movil {
+  padding: 44px 0 8px;
+}
+
+@media (min-width: 1000px) {
+  .intro-movil {
+    display: none;
+  }
+}
+
+.intro-movil h1 {
+  font-family: var(--fuente-display);
+  font-size: clamp(34px, 9vw, 46px);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  margin: 18px 0 16px;
+}
+
+.intro-movil h1 em {
+  font-style: italic;
+  color: var(--oro-claro);
+}
+
+.intro-movil p {
+  color: var(--humo);
+  font-size: 15px;
+  margin: 0;
+}
+
+/* ── Formulario ────────────────────────────────────────────── */
+.formulario {
+  padding-top: 24px;
+  max-width: 640px;
+}
+
+@media (min-width: 1000px) {
+  .formulario {
+    padding-top: 72px;
+  }
+}
+
+.bloque {
+  margin-bottom: 12px;
+  padding-bottom: 40px;
+}
+
+.bloque-cabecera {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding-bottom: 14px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--linea);
+}
+
+.bloque-numero {
+  font-family: var(--fuente-texto);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: var(--oro);
+}
+
+.bloque-nombre {
+  font-family: var(--fuente-texto);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--humo);
+}
+
+.campo {
+  margin-bottom: 28px;
+}
+
+.campo-etiqueta {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--marfil);
+  margin-bottom: 4px;
+}
+
+.campo-ayuda {
+  display: block;
+  font-size: 13px;
+  color: var(--humo-tenue);
+  margin-bottom: 10px;
+}
+
+.entrada,
+.area,
+.lista {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-family: var(--fuente-texto);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--marfil);
+  background-color: var(--tinta-800);
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 3px;
+  padding: 13px 15px;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+  appearance: none;
+}
+
+.area {
+  min-height: 116px;
+  resize: vertical;
+}
+
+.lista {
+  padding-right: 44px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--humo) 50%),
+    linear-gradient(135deg, var(--humo) 50%, transparent 50%);
+  background-position: calc(100% - 20px) calc(50% + 1px), calc(100% - 14px) calc(50% + 1px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.lista option {
+  background-color: var(--tinta-800);
+  color: var(--marfil);
+}
+
+.entrada::placeholder,
+.area::placeholder {
+  color: var(--humo-tenue);
+}
+
+.entrada:hover,
+.area:hover,
+.lista:hover {
+  border-color: rgba(243, 238, 227, 0.3);
+}
+
+.entrada:focus-visible,
+.area:focus-visible,
+.lista:focus-visible {
+  outline: none;
+  border-color: var(--oro);
+  background-color: var(--tinta-700);
+  box-shadow: 0 0 0 3px var(--oro-tenue);
+}
+
+.entrada[data-error="si"],
+.area[data-error="si"],
+.lista[data-error="si"] {
+  border-color: var(--alerta);
+}
+
+.campo-error {
+  display: block;
+  font-size: 13px;
+  color: var(--alerta);
+  margin-top: 7px;
+}
+
+.pesos {
+  position: relative;
+}
+
+.pesos-simbolo {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: var(--humo);
+  pointer-events: none;
+}
+
+.pesos .entrada {
+  padding-left: 32px;
+}
+
+.pesos-sufijo {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--humo-tenue);
+  pointer-events: none;
+}
+
+.trampa {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ── Envío ─────────────────────────────────────────────────── */
+.pie {
+  padding-top: 8px;
+}
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  font-family: var(--fuente-texto);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--tinta-900);
+  background-color: var(--oro);
+  border: 1px solid var(--oro);
+  border-radius: 3px;
+  padding: 18px 24px;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.boton:hover:not(:disabled) {
+  background-color: var(--oro-claro);
+  border-color: var(--oro-claro);
+}
+
+.boton:focus-visible {
+  outline: 2px solid var(--oro-claro);
+  outline-offset: 3px;
+}
+
+.boton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.boton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.pie-nota {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--humo-tenue);
+}
+
+.aviso {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid rgba(226, 121, 95, 0.4);
+  border-left-width: 2px;
+  border-radius: 3px;
+  background-color: rgba(226, 121, 95, 0.08);
+  color: #f0b6a5;
+  font-size: 14px;
+}
+
+/* ── Estado recibido ───────────────────────────────────────── */
+.recibido {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 72px 0 120px;
+  max-width: 560px;
+}
+
+.recibido h2 {
+  font-family: var(--fuente-display);
+  font-size: clamp(40px, 6vw, 60px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 28px 0 18px;
+}
+
+.recibido h2 em {
+  font-style: italic;
+  color: var(--oro-claro);
+}
+
+.recibido p {
+  color: var(--humo);
+  font-size: 16px;
+  margin: 0 0 14px;
+}
+
+.recibido-linea {
+  width: 100%;
+  height: 1px;
+  background-color: var(--linea);
+  margin: 32px 0 24px;
+}
+
+/* ── Constelación (elemento firma) ─────────────────────────── */
+.constelacion-caja {
+  width: 100%;
+}
+
+.constelacion {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* En móvil la constelación vive en la intro, con espacio para leerse. La
+   cuenta la lleva la barra fija de abajo, así que aquí sobra. */
+.intro-movil .constelacion-caja {
+  max-width: 320px;
+  margin-top: 30px;
+}
+
+.intro-movil .marcador {
+  display: none;
+}
+
+.constelacion-guia {
+  fill: none;
+  stroke: var(--marfil);
+  stroke-width: 0.75;
+  opacity: 0.14;
+}
+
+.constelacion-arista {
+  fill: none;
+  stroke: var(--oro);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.55;
+  stroke-dasharray: var(--largo);
+  stroke-dashoffset: var(--largo);
+  transition: stroke-dashoffset 0.65s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.constelacion-arista[data-encendida="si"] {
+  stroke-dashoffset: 0;
+}
+
+.constelacion-halo {
+  fill: var(--oro);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.4);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.constelacion-halo[data-encendida="si"] {
+  opacity: 0.16;
+  transform: scale(1);
+}
+
+.constelacion-punto {
+  fill: #7f8b9f;
+  transition: fill 0.4s ease, r 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.constelacion-punto[data-encendida="si"] {
+  fill: var(--oro-claro);
+}
+
+.constelacion-polar {
+  fill: #7f8b9f;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.55);
+  transition: fill 0.5s ease, transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.constelacion-polar[data-encendida="si"] {
+  fill: var(--oro-claro);
+  transform: scale(1);
+}
+
+.marcador {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.marcador-cifra {
+  font-family: var(--fuente-display);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--oro-claro);
+}
+
+.marcador-total {
+  font-family: var(--fuente-display);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--humo-tenue);
+}
+
+.marcador-texto {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--humo);
+}
+
+/* ── Entrada escalonada al cargar ──────────────────────────── */
+.aparece {
+  animation: aparece 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes aparece {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
